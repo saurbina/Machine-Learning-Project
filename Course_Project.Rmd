@@ -1,0 +1,94 @@
+---
+title: "Machine Learning Course Project"
+author: "Sebastián Urbina"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+## Summary 
+
+In the next projecto we will create a model with the objective of predicting the manner in which certain individuals did exercise (this is the "classe" variable in the data).For this task we will use the data about personal activity relatively inexpensively, collected by devices like Jawbone Up, Nike FuelBand, and Fitbit. 
+
+These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+
+
+## Data Cleaning 
+
+The database must be cleaned, so that lost cases, NAs and variables with very little data are eliminated. This must be done in both databases, training and test set. In this way we will have a database that gives us a more accurate result
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(caret);library(ggplot2);library(rattle);library(randomForest);library(gbm);library(rpart); library(randomForest)
+trainingdata <- as.data.frame(read.csv("~/Downloads/pml-training.csv"))
+test <-  as.data.frame(read.csv("~/Downloads/pml-testing.csv"))
+trainingdata <- trainingdata[, colSums(is.na(trainingdata)) == 0] 
+test <- test[, colSums(is.na(test)) == 0] 
+nzvcol <- nearZeroVar(trainingdata)
+nzvcolt <- nearZeroVar(test)
+trainingdata <- trainingdata[, -nzvcol]
+test <- test[, -nzvcolt]
+trainingdata <- trainingdata[,8:length(colnames(trainingdata))]
+test <- test[,8:length(colnames(test))]
+data(trainingdata); data(test)
+```
+
+## Model Creation 
+
+The training data is divided into two sets. This first is a training set with 70% of the data which is used to train the model, and the second one is a validation set.
+
+ 
+```{r data Partition, echo=TRUE}
+inTrain <- createDataPartition(y = trainingdata$classe,
+                               p = 0.70, list = FALSE)
+training <- trainingdata[inTrain,]
+testing <- trainingdata[- inTrain,] 
+dim(training)
+```
+
+## Models Fits 
+
+We will create three models fits with differents methods (random forest, trees, and boosting). Random forest are usually one of the two top perfoming algorithm in prediction contests. It´s very accurate but difficult to interpret and have de cons of speed. On the other hand, predicting with trees are easy to interpret but it´s harder to estimate uncertainty. Finally, boosting is the other top performing algorith in constest. Boosting take lost of (possibly) week predictors and weight them ans add them up. We get as a result a stronger predictor. 
+
+It will be used a 5-fold cross validation for the models. We will compare the accuracy of each prediction with the testing data partition, and the best one will be the method chossen to the test data. 
+
+```{r models, echo=TRUE}
+control <- trainControl(method="cv", 5)
+mod1 <- train(classe ~ ., data=training, method="rf", prox = TRUE, trControl=control)
+mod2 <- train(classe ~., data = training, method = "rpart", trControl=control)
+mod3 <- train(classe ~., data = training, method = "gbm",  verbose = FALSE, trControl=control)
+pred1 <- predict(mod1,newdata = testing)
+pred2 <- predict(mod2,newdata = testing)
+pred3 <- predict(mod3,newdata = testing)
+```
+
+```{r echo = FALSE}
+confusionMatrix(pred1, testing$classe)
+confusionMatrix(pred2, testing$classe)
+confusionMatrix(pred3, testing$classe)
+```
+
+```{r include=FALSE}
+accuracy1 <- postResample(pred1, testing$classe)
+out.sample <- 1 - accuracy1[1]
+```
+
+In conclusion, it is appreciated that the accuracy of the random forest methos its better than the other two. This method (Random Forest) have an accuracy of `r accuracy1[1]` and an out sample of  `r out.sample[1]`. 
+
+
+# Model applied  with the test data 
+
+Finally, we will predict the test data with the random forest model fit. 
+
+```{r echo = FALSE}
+pred.final <- predict(mod1,
+                      test[, -length(names(test))])
+
+pred.final
+```
+
+
+## Appendix Predicting with trees plot 
+
+```{r echo = FALSE}
+mod2 <- rpart(classe ~., data = training, method = "class")
+fancyRpartPlot(mod2)
+````
